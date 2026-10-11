@@ -174,6 +174,11 @@ def main():
             forward(f.read(), Telegram("x", "0", dry=True))
         return 0
     env = os.environ
+    missing = [k for k in ("IMAP_HOST", "IMAP_USER", "IMAP_PASSWORD", "TG_TOKEN", "TG_CHAT_ID") if not env.get(k)]
+    if missing:
+        # Пока секреты не вписаны, расписание не должно падать и слать письма об ошибке.
+        print("Не настроено, пропускаю. Не заданы секреты:", ", ".join(missing))
+        return 0
     only = tuple(x.strip().lower() for x in env.get("ONLY_FROM", "").split(",") if x.strip())
     tg = Telegram(env["TG_TOKEN"], env["TG_CHAT_ID"], env.get("TG_THREAD_ID") or None)
     box = imaplib.IMAP4_SSL(env["IMAP_HOST"])
