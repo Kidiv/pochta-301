@@ -1,0 +1,27 @@
+name: Чтобы расписание не отключилось
+
+# GitHub выключает расписание в репозитории, где два месяца нет изменений.
+# Раз в месяц это задание обновляет файл с датой, и репозиторий считается живым.
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  metka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Обновить отметку
+        run: |
+          date -u +%Y-%m-%d > .metka
+          git config user.name "pochta-bot"
+          git config user.email "pochta-bot@users.noreply.github.com"
+          git add .metka
+          git commit -m "Отметка: расписание работает" || exit 0
+          git push
