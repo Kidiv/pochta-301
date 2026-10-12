@@ -8,6 +8,9 @@
 #   TG_CHAT_ID     номер группы, например -1004493927052
 #   TG_THREAD_ID   номер темы в группе (можно не задавать, тогда в общий чат)
 #   ONLY_FROM      необязательно: через запятую куски адресов, от кого пересылать
+#   SKIP_FROM      от кого не пересылать (в расписании не задаётся); по умолчанию ".mail.ru", то есть
+#                  служебные письма самой почты (security@id.mail.ru и подобные), а
+#                  обычные адреса @mail.ru под это не попадают
 # Проверка без почты и без Телеграма:
 #   python pochta_v_telegram.py --test письмо.eml
 import email
@@ -139,8 +142,23 @@ class Telegram:
         self._call("sendDocument", body, "multipart/form-data; boundary=" + boundary)
 
 
-def forward(raw, tg, only_from=()):
+def skipped(addr, skip_from):
+    """Пункт с точкой в начале сравнивается с концом домена, остальные ищутся в адресе."""
+    addr = addr.lower()
+    domain = addr.rsplit("@", 1)[-1]
+    for x in skip_from:
+        if x.startswith("."):
+            if domain.endswith(x):
+                return True
+        elif x in addr:
+            return True
+    return False
+
+
+def forward(raw, tg, only_from=(), skip_from=()):
     head, body, files, addr = parse(raw)
+    if skipped(addr, skip_from):
+        return False
     if only_from and not any(x in addr.lower() for x in only_from):
         return False
     notes = []
@@ -180,6 +198,7 @@ def main():
         print("Не настроено, пропускаю. Не заданы секреты:", ", ".join(missing))
         return 0
     only = tuple(x.strip().lower() for x in env.get("ONLY_FROM", "").split(",") if x.strip())
+    skip = tuple(x.strip().lower() for x in (env.get("SKIP_FROM") or ".mail.ru").split(",") if x.strip())
     tg = Telegram(env["TG_TOKEN"], env["TG_CHAT_ID"], env.get("TG_THREAD_ID") or None)
     box = imaplib.IMAP4_SSL(env["IMAP_HOST"])
     box.login(env["IMAP_USER"], env["IMAP_PASSWORD"])
@@ -192,9 +211,9 @@ def main():
         _, data = box.fetch(num, "(BODY.PEEK[])")   # PEEK: письмо остаётся непрочитанным
         raw = data[0][1]
         try:
-            sent = forward(raw, tg, only)
+            sent = forward(raw, tg, only, skip)
             box.store(num, "+FLAGS", "\\Seen")       # отмечаем только после удачной отправки
-            print("письмо", num.decode(), "переслано" if sent else "пропущено по отправителю")
+            print("письмо", num.decode(), "переслано" if sent else "пропущено: служебное или не от нужного отправителя")
         except Exception as e:
             failed += 1
             print("письмо", num.decode(), "НЕ переслано:", e)
