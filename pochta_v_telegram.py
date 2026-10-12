@@ -197,7 +197,8 @@ def main():
         # Пока секреты не вписаны, расписание не должно падать и слать письма об ошибке.
         print("Не настроено, пропускаю. Не заданы секреты:", ", ".join(missing))
         return 0
-    only = tuple(x.strip().lower() for x in env.get("ONLY_FROM", "").split(",") if x.strip())
+    # В ONLY_FROM считаются только куски адресов: с «@» или с точкой. Прочее не действует.
+    only = tuple(x.strip().lower() for x in env.get("ONLY_FROM", "").split(",") if "@" in x or "." in x)
     skip = tuple(x.strip().lower() for x in (env.get("SKIP_FROM") or ".mail.ru").split(",") if x.strip())
     tg = Telegram(env["TG_TOKEN"], env["TG_CHAT_ID"], env.get("TG_THREAD_ID") or None)
     box = imaplib.IMAP4_SSL(env["IMAP_HOST"])
